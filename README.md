@@ -10,12 +10,17 @@ It serves as a live gallery and codebase for designers, developers, and product 
 
 This repository includes several unique design canvases, each tailored to specific aesthetics and industries:
 
-### 1. 💳 Sage Wallet (Fintech Dashboard)
+### 1. 🌌 Tara AI Workspace Studio
+- **Path:** `/projects/tara-ai`
+- **Description:** A pixel-perfect, high-precision AI workspace and conversational agent interface built according to Anthropic's Frontend Design principles. Features a collapsed-by-default expandable sidebar dock (with `⌘B` shortcut), glowing 3D gradient orb hero, interactive agent cards (Sam Lee Data Assistant), and floating prompt actions.
+- **Vibe:** Modern AI studio, minimalist, fluid animations, distraction-free.
+
+### 2. 💳 Sage Wallet (Fintech Dashboard)
 - **Path:** `/projects/sage-wallet`
 - **Description:** A conceptual dashboard for a neo-banking or crypto wallet application. Features sleek data visualization patterns, modern card layouts, and subtle gradients.
 - **Vibe:** High-tech, dark mode optimized, trustworthy, financial.
 
-### 2. 💼 Upwork Redesign Concept
+### 3. 💼 Upwork Redesign Concept
 - **Path:** `/projects/upwork-redesign`
 - **Description:** A conceptual UX teardown and rebuild of a major freelancer marketplace. Focuses on reducing cognitive load, improving accessibility, and modernizing the layout using generous whitespace and clean typography.
 - **Vibe:** Professional, spacious, user-centric, enterprise.

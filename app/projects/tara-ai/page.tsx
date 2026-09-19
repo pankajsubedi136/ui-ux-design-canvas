@@ -58,6 +58,12 @@ export interface ChatHistoryItem {
   messages: ChatMessage[];
 }
 
+interface MenuAnchorState {
+  item: ChatHistoryItem;
+  top: number;
+  left: number;
+}
+
 /* =========================================================================
    2. BRAND ASSETS: TARA AI MATHEMATICAL STELLAR KNOT LOGO
    ========================================================================= */
@@ -262,8 +268,8 @@ export default function TaraAIPage() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
-  // Context Menu & Inline Renaming for Chat items
-  const [activeMenuChatId, setActiveMenuChatId] = useState<string | null>(null);
+  // Fixed Context Menu Anchor & Inline Renaming for Chat items
+  const [menuAnchor, setMenuAnchor] = useState<MenuAnchorState | null>(null);
   const [renamingChatId, setRenamingChatId] = useState<string | null>(null);
   const [renameTitle, setRenameTitle] = useState<string>("");
 
@@ -291,13 +297,23 @@ export default function TaraAIPage() {
     }
   }, [chatMessages, isGenerating]);
 
-  // Close context menu when clicking outside
+  // Global listeners: close context menu on click outside, scroll, or resize
   useEffect(() => {
     const handleOutsideClick = () => {
-      setActiveMenuChatId(null);
+      setMenuAnchor(null);
     };
+    const handleScrollOrResize = () => {
+      setMenuAnchor(null);
+    };
+
     window.addEventListener("click", handleOutsideClick);
-    return () => window.removeEventListener("click", handleOutsideClick);
+    window.addEventListener("scroll", handleScrollOrResize, true);
+    window.addEventListener("resize", handleScrollOrResize);
+    return () => {
+      window.removeEventListener("click", handleOutsideClick);
+      window.removeEventListener("scroll", handleScrollOrResize, true);
+      window.removeEventListener("resize", handleScrollOrResize);
+    };
   }, []);
 
   // Keyboard shortcut: Cmd+B / Ctrl+B to toggle sidebar, Escape to dismiss menu
@@ -307,7 +323,7 @@ export default function TaraAIPage() {
         e.preventDefault();
         setSidebarOpen((prev) => !prev);
       } else if (e.key === "Escape") {
-        setActiveMenuChatId(null);
+        setMenuAnchor(null);
         setRenamingChatId(null);
       }
     };
@@ -327,17 +343,36 @@ export default function TaraAIPage() {
     setChatMessages(item.messages);
   };
 
+  // Toggle Context Menu with Smart Viewport Detection (Prevents bottom cutoff)
+  const handleToggleMenu = (e: React.MouseEvent<HTMLButtonElement>, item: ChatHistoryItem) => {
+    e.stopPropagation();
+    if (menuAnchor?.item.id === item.id) {
+      setMenuAnchor(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuHeight = 225; // Approximate height of the 5-item menu
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openUpward = spaceBelow < menuHeight + 20;
+
+    setMenuAnchor({
+      item,
+      top: openUpward ? Math.max(12, rect.top - menuHeight - 6) : rect.bottom + 6,
+      left: Math.min(window.innerWidth - 186, Math.max(10, rect.right - 176))
+    });
+  };
+
   // Context Menu Actions
   const handleShareChat = (item: ChatHistoryItem) => {
     navigator.clipboard.writeText(`https://tara.ai/chat/${item.id}`);
-    setActiveMenuChatId(null);
+    setMenuAnchor(null);
     setIsShareOpen(true);
   };
 
   const handleStartRename = (item: ChatHistoryItem) => {
     setRenamingChatId(item.id);
     setRenameTitle(item.title);
-    setActiveMenuChatId(null);
+    setMenuAnchor(null);
   };
 
   const handleSaveRename = (id: string) => {
@@ -360,7 +395,7 @@ export default function TaraAIPage() {
       }
       return h;
     }));
-    setActiveMenuChatId(null);
+    setMenuAnchor(null);
   };
 
   const handleArchiveChat = (id: string) => {
@@ -368,7 +403,7 @@ export default function TaraAIPage() {
     if (activeChatId === id) {
       handleStartNewChat();
     }
-    setActiveMenuChatId(null);
+    setMenuAnchor(null);
   };
 
   const handleDeleteChat = (id: string) => {
@@ -376,7 +411,7 @@ export default function TaraAIPage() {
     if (activeChatId === id) {
       handleStartNewChat();
     }
-    setActiveMenuChatId(null);
+    setMenuAnchor(null);
   };
 
   const handleSendMessage = (textToSend?: string) => {
@@ -439,9 +474,9 @@ export default function TaraAIPage() {
     item.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Helper to render chat history items with attached 3-dots popup
-  const renderHistoryItem = (item: ChatHistoryItem, isBottomSection = false) => {
-    const isMenuOpen = activeMenuChatId === item.id;
+  // Helper to render chat history items
+  const renderHistoryItem = (item: ChatHistoryItem) => {
+    const isMenuOpen = menuAnchor?.item.id === item.id;
     const isRenaming = renamingChatId === item.id;
     const isSelected = activeChatId === item.id;
 
@@ -489,12 +524,9 @@ export default function TaraAIPage() {
         </div>
 
         {/* Three Dots Button */}
-        <div className="relative shrink-0">
+        <div className="shrink-0">
           <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              setActiveMenuChatId(isMenuOpen ? null : item.id);
-            }}
+            onClick={(e) => handleToggleMenu(e, item)}
             className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
               isMenuOpen 
                 ? "opacity-100 bg-neutral-200/80 dark:bg-neutral-700 text-neutral-800 dark:text-white" 
@@ -504,66 +536,6 @@ export default function TaraAIPage() {
           >
             <MoreHorizontal className="w-3.5 h-3.5" />
           </button>
-
-          {/* Context Pop-up Menu matching user's attached screenshot */}
-          {isMenuOpen && (
-            <div 
-              onClick={(e) => e.stopPropagation()}
-              className={`absolute right-0 ${isBottomSection ? "bottom-full mb-2" : "top-full mt-2"} w-44 rounded-[18px] p-1.5 z-50 border shadow-[0_12px_32px_rgba(0,0,0,0.14),0_2px_8px_rgba(0,0,0,0.06)] animate-in fade-in zoom-in-95 duration-100 select-none ${
-                isDarkMode 
-                  ? "bg-[#222226] border-neutral-700 text-neutral-100 shadow-[0_12px_32px_rgba(0,0,0,0.5)]" 
-                  : "bg-white border-neutral-200 text-neutral-800"
-              }`}
-            >
-              {/* 1. Share */}
-              <button
-                onClick={() => handleShareChat(item)}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-800 dark:text-neutral-200 transition-colors"
-              >
-                <Share2 className="w-4 h-4 text-neutral-500 dark:text-neutral-400 stroke-[1.75]" />
-                <span>Share</span>
-              </button>
-
-              {/* 2. Rename */}
-              <button
-                onClick={() => handleStartRename(item)}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-800 dark:text-neutral-200 transition-colors"
-              >
-                <Pencil className="w-4 h-4 text-neutral-500 dark:text-neutral-400 stroke-[1.75]" />
-                <span>Rename</span>
-              </button>
-
-              {/* Divider line matching reference */}
-              <div className="my-1 border-t border-neutral-200/80 dark:border-neutral-700/60" />
-
-              {/* 3. Pin chat / Unpin chat */}
-              <button
-                onClick={() => handleTogglePin(item)}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-800 dark:text-neutral-200 transition-colors"
-              >
-                <Pin className="w-4 h-4 text-neutral-500 dark:text-neutral-400 stroke-[1.75]" />
-                <span>{item.timeframe === "saved" ? "Unpin chat" : "Pin chat"}</span>
-              </button>
-
-              {/* 4. Archive */}
-              <button
-                onClick={() => handleArchiveChat(item.id)}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-800 dark:text-neutral-200 transition-colors"
-              >
-                <Archive className="w-4 h-4 text-neutral-500 dark:text-neutral-400 stroke-[1.75]" />
-                <span>Archive</span>
-              </button>
-
-              {/* 5. Delete (Red / Destructive) */}
-              <button
-                onClick={() => handleDeleteChat(item.id)}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-              >
-                <Trash2 className="w-4 h-4 text-rose-500 stroke-[1.75]" />
-                <span>Delete</span>
-              </button>
-            </div>
-          )}
         </div>
       </div>
     );
@@ -777,7 +749,7 @@ export default function TaraAIPage() {
                 </div>
 
                 <div className="mt-1 space-y-1">
-                  {historyItems.filter(h => h.timeframe === "saved").map(item => renderHistoryItem(item, false))}
+                  {historyItems.filter(h => h.timeframe === "saved").map(item => renderHistoryItem(item))}
                 </div>
               </div>
 
@@ -793,7 +765,7 @@ export default function TaraAIPage() {
 
                 {!todayCollapsed && (
                   <div className="mt-1 space-y-1">
-                    {historyItems.filter(h => h.timeframe === "today").map(item => renderHistoryItem(item, false))}
+                    {historyItems.filter(h => h.timeframe === "today").map(item => renderHistoryItem(item))}
                   </div>
                 )}
               </div>
@@ -810,7 +782,7 @@ export default function TaraAIPage() {
 
                 {!yesterdayCollapsed && (
                   <div className="mt-1 space-y-1">
-                    {historyItems.filter(h => h.timeframe === "yesterday").map(item => renderHistoryItem(item, true))}
+                    {historyItems.filter(h => h.timeframe === "yesterday").map(item => renderHistoryItem(item))}
                   </div>
                 )}
               </div>
@@ -1257,7 +1229,75 @@ export default function TaraAIPage() {
       </main>
 
       {/* -------------------------------------------------------------
-          MODALS & OVERLAYS (Capsule buttons & clean borders)
+          4. GLOBAL FIXED CHAT CONTEXT POPUP MENU (100% VISIBLE, NO CLIPPING)
+          ------------------------------------------------------------- */}
+      {menuAnchor && (
+        <div 
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "fixed",
+            top: `${menuAnchor.top}px`,
+            left: `${menuAnchor.left}px`,
+            zIndex: 99999
+          }}
+          className={`w-44 rounded-[18px] p-1.5 border shadow-[0_16px_36px_rgba(0,0,0,0.18),0_2px_8px_rgba(0,0,0,0.06)] animate-in fade-in zoom-in-95 duration-100 select-none ${
+            isDarkMode 
+              ? "bg-[#222226] border-neutral-700 text-neutral-100 shadow-[0_16px_36px_rgba(0,0,0,0.6)]" 
+              : "bg-white border-neutral-200 text-neutral-800"
+          }`}
+        >
+          {/* 1. Share */}
+          <button
+            onClick={() => handleShareChat(menuAnchor.item)}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-800 dark:text-neutral-200 transition-colors"
+          >
+            <Share2 className="w-4 h-4 text-neutral-500 dark:text-neutral-400 stroke-[1.75]" />
+            <span>Share</span>
+          </button>
+
+          {/* 2. Rename */}
+          <button
+            onClick={() => handleStartRename(menuAnchor.item)}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-800 dark:text-neutral-200 transition-colors"
+          >
+            <Pencil className="w-4 h-4 text-neutral-500 dark:text-neutral-400 stroke-[1.75]" />
+            <span>Rename</span>
+          </button>
+
+          {/* Divider line matching reference */}
+          <div className="my-1 border-t border-neutral-200/80 dark:border-neutral-700/60" />
+
+          {/* 3. Pin chat / Unpin chat */}
+          <button
+            onClick={() => handleTogglePin(menuAnchor.item)}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-800 dark:text-neutral-200 transition-colors"
+          >
+            <Pin className="w-4 h-4 text-neutral-500 dark:text-neutral-400 stroke-[1.75]" />
+            <span>{menuAnchor.item.timeframe === "saved" ? "Unpin chat" : "Pin chat"}</span>
+          </button>
+
+          {/* 4. Archive */}
+          <button
+            onClick={() => handleArchiveChat(menuAnchor.item.id)}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-800 dark:text-neutral-200 transition-colors"
+          >
+            <Archive className="w-4 h-4 text-neutral-500 dark:text-neutral-400 stroke-[1.75]" />
+            <span>Archive</span>
+          </button>
+
+          {/* 5. Delete (Red / Destructive) */}
+          <button
+            onClick={() => handleDeleteChat(menuAnchor.item.id)}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+          >
+            <Trash2 className="w-4 h-4 text-rose-500 stroke-[1.75]" />
+            <span>Delete</span>
+          </button>
+        </div>
+      )}
+
+      {/* -------------------------------------------------------------
+          5. MODALS & OVERLAYS (Capsule buttons & clean borders)
           ------------------------------------------------------------- */}
 
       {/* CONFIGURATION MODAL */}

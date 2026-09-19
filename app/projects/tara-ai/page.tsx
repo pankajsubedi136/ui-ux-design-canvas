@@ -30,6 +30,10 @@ import {
   BarChart3,
   Layers,
   Sparkles,
+  Pencil,
+  Pin,
+  Archive,
+  Trash2,
   Image as ImageIcon
 } from "lucide-react";
 
@@ -110,11 +114,7 @@ function TaraLogo({
 }
 
 /* =========================================================================
-   3. ATOMIC BUTTON COMPONENT (UI/UX PRO MAX SPECIFICATION)
-   - Primary Capsule: Matte dark obsidian gradient with soft elevation shadow
-   - Circular Icon: Clean white circle with subtle border and ambient shadow
-   - Outlined Capsule: Secondary actions with refined typography
-   - Zero emojis, clean vector icons only, no lightning icon
+   3. ATOMIC BUTTON COMPONENT
    ========================================================================= */
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -262,6 +262,11 @@ export default function TaraAIPage() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
+  // Context Menu & Inline Renaming for Chat items
+  const [activeMenuChatId, setActiveMenuChatId] = useState<string | null>(null);
+  const [renamingChatId, setRenamingChatId] = useState<string | null>(null);
+  const [renameTitle, setRenameTitle] = useState<string>("");
+
   // Modals & Overlays
   const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
   const [isShareOpen, setIsShareOpen] = useState<boolean>(false);
@@ -286,12 +291,24 @@ export default function TaraAIPage() {
     }
   }, [chatMessages, isGenerating]);
 
-  // Keyboard shortcut: Cmd+B / Ctrl+B to toggle sidebar
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setActiveMenuChatId(null);
+    };
+    window.addEventListener("click", handleOutsideClick);
+    return () => window.removeEventListener("click", handleOutsideClick);
+  }, []);
+
+  // Keyboard shortcut: Cmd+B / Ctrl+B to toggle sidebar, Escape to dismiss menu
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
         e.preventDefault();
         setSidebarOpen((prev) => !prev);
+      } else if (e.key === "Escape") {
+        setActiveMenuChatId(null);
+        setRenamingChatId(null);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -308,6 +325,58 @@ export default function TaraAIPage() {
   const handleSelectHistory = (item: ChatHistoryItem) => {
     setActiveChatId(item.id);
     setChatMessages(item.messages);
+  };
+
+  // Context Menu Actions
+  const handleShareChat = (item: ChatHistoryItem) => {
+    navigator.clipboard.writeText(`https://tara.ai/chat/${item.id}`);
+    setActiveMenuChatId(null);
+    setIsShareOpen(true);
+  };
+
+  const handleStartRename = (item: ChatHistoryItem) => {
+    setRenamingChatId(item.id);
+    setRenameTitle(item.title);
+    setActiveMenuChatId(null);
+  };
+
+  const handleSaveRename = (id: string) => {
+    if (renameTitle.trim()) {
+      setHistoryItems(prev => prev.map(h => h.id === id ? { ...h, title: renameTitle.trim() } : h));
+    }
+    setRenamingChatId(null);
+  };
+
+  const handleTogglePin = (item: ChatHistoryItem) => {
+    setHistoryItems(prev => prev.map(h => {
+      if (h.id === item.id) {
+        const isCurrentlySaved = h.timeframe === "saved";
+        return {
+          ...h,
+          timeframe: isCurrentlySaved ? "today" : "saved",
+          iconType: isCurrentlySaved ? undefined : "chat",
+          color: isCurrentlySaved ? undefined : "bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-200"
+        };
+      }
+      return h;
+    }));
+    setActiveMenuChatId(null);
+  };
+
+  const handleArchiveChat = (id: string) => {
+    setHistoryItems(prev => prev.filter(h => h.id !== id));
+    if (activeChatId === id) {
+      handleStartNewChat();
+    }
+    setActiveMenuChatId(null);
+  };
+
+  const handleDeleteChat = (id: string) => {
+    setHistoryItems(prev => prev.filter(h => h.id !== id));
+    if (activeChatId === id) {
+      handleStartNewChat();
+    }
+    setActiveMenuChatId(null);
   };
 
   const handleSendMessage = (textToSend?: string) => {
@@ -369,6 +438,136 @@ export default function TaraAIPage() {
   const filteredHistory = historyItems.filter(item => 
     item.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Helper to render chat history items with attached 3-dots popup
+  const renderHistoryItem = (item: ChatHistoryItem, isBottomSection = false) => {
+    const isMenuOpen = activeMenuChatId === item.id;
+    const isRenaming = renamingChatId === item.id;
+    const isSelected = activeChatId === item.id;
+
+    return (
+      <div 
+        key={item.id}
+        onClick={() => {
+          if (!isRenaming) {
+            handleSelectHistory(item);
+          }
+        }}
+        className={`group relative flex items-center justify-between px-3 py-2 rounded-full cursor-pointer transition-colors border ${
+          isSelected 
+            ? "bg-white dark:bg-[#18181B] border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-white font-medium shadow-[0_2px_6px_rgba(0,0,0,0.03)]" 
+            : "border-transparent text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/60"
+        }`}
+      >
+        <div className="flex items-center gap-2.5 truncate flex-1 min-w-0 pr-1">
+          {item.timeframe === "saved" && (
+            <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${item.color || "bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-200"}`}>
+              {item.iconType === "chat" && <MessageSquare className="w-2.5 h-2.5" />}
+              {item.iconType === "sun" && <ImageIcon className="w-2.5 h-2.5" />}
+              {item.iconType === "analyst" && <BarChart3 className="w-2.5 h-2.5" />}
+              {!item.iconType && <Pin className="w-2.5 h-2.5 text-neutral-600 dark:text-neutral-300" />}
+            </div>
+          )}
+
+          {isRenaming ? (
+            <input 
+              type="text" 
+              autoFocus
+              value={renameTitle}
+              onChange={(e) => setRenameTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSaveRename(item.id);
+                else if (e.key === "Escape") setRenamingChatId(null);
+              }}
+              onBlur={() => handleSaveRename(item.id)}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full bg-transparent border-b border-[#0066FF] outline-none text-xs font-medium text-neutral-900 dark:text-white px-0.5 py-0"
+            />
+          ) : (
+            <span className="truncate text-xs">{item.title}</span>
+          )}
+        </div>
+
+        {/* Three Dots Button */}
+        <div className="relative shrink-0">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveMenuChatId(isMenuOpen ? null : item.id);
+            }}
+            className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
+              isMenuOpen 
+                ? "opacity-100 bg-neutral-200/80 dark:bg-neutral-700 text-neutral-800 dark:text-white" 
+                : "opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-200/60 dark:hover:bg-neutral-700/60"
+            }`}
+            title="Chat options"
+          >
+            <MoreHorizontal className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Context Pop-up Menu matching user's attached screenshot */}
+          {isMenuOpen && (
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className={`absolute right-0 ${isBottomSection ? "bottom-full mb-2" : "top-full mt-2"} w-44 rounded-[18px] p-1.5 z-50 border shadow-[0_12px_32px_rgba(0,0,0,0.14),0_2px_8px_rgba(0,0,0,0.06)] animate-in fade-in zoom-in-95 duration-100 select-none ${
+                isDarkMode 
+                  ? "bg-[#222226] border-neutral-700 text-neutral-100 shadow-[0_12px_32px_rgba(0,0,0,0.5)]" 
+                  : "bg-white border-neutral-200 text-neutral-800"
+              }`}
+            >
+              {/* 1. Share */}
+              <button
+                onClick={() => handleShareChat(item)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-800 dark:text-neutral-200 transition-colors"
+              >
+                <Share2 className="w-4 h-4 text-neutral-500 dark:text-neutral-400 stroke-[1.75]" />
+                <span>Share</span>
+              </button>
+
+              {/* 2. Rename */}
+              <button
+                onClick={() => handleStartRename(item)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-800 dark:text-neutral-200 transition-colors"
+              >
+                <Pencil className="w-4 h-4 text-neutral-500 dark:text-neutral-400 stroke-[1.75]" />
+                <span>Rename</span>
+              </button>
+
+              {/* Divider line matching reference */}
+              <div className="my-1 border-t border-neutral-200/80 dark:border-neutral-700/60" />
+
+              {/* 3. Pin chat / Unpin chat */}
+              <button
+                onClick={() => handleTogglePin(item)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-800 dark:text-neutral-200 transition-colors"
+              >
+                <Pin className="w-4 h-4 text-neutral-500 dark:text-neutral-400 stroke-[1.75]" />
+                <span>{item.timeframe === "saved" ? "Unpin chat" : "Pin chat"}</span>
+              </button>
+
+              {/* 4. Archive */}
+              <button
+                onClick={() => handleArchiveChat(item.id)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-700/60 text-neutral-800 dark:text-neutral-200 transition-colors"
+              >
+                <Archive className="w-4 h-4 text-neutral-500 dark:text-neutral-400 stroke-[1.75]" />
+                <span>Archive</span>
+              </button>
+
+              {/* 5. Delete (Red / Destructive) */}
+              <button
+                onClick={() => handleDeleteChat(item.id)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-[12px] text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+              >
+                <Trash2 className="w-4 h-4 text-rose-500 stroke-[1.75]" />
+                <span>Delete</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     // Default Light Mode (#F7F7F8), toggleable to obsidian dark tone (#09090B)
@@ -578,29 +777,7 @@ export default function TaraAIPage() {
                 </div>
 
                 <div className="mt-1 space-y-1">
-                  {historyItems.filter(h => h.timeframe === "saved").map(item => (
-                    <div 
-                      key={item.id}
-                      onClick={() => handleSelectHistory(item)}
-                      className={`group flex items-center justify-between px-3 py-2 rounded-full cursor-pointer transition-colors border ${
-                        activeChatId === item.id 
-                          ? "bg-white dark:bg-[#18181B] border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-white font-medium shadow-[0_2px_6px_rgba(0,0,0,0.03)]" 
-                          : "border-transparent text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/60"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 truncate">
-                        <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${item.color}`}>
-                          {item.iconType === "chat" && <MessageSquare className="w-2.5 h-2.5" />}
-                          {item.iconType === "sun" && <ImageIcon className="w-2.5 h-2.5" />}
-                          {item.iconType === "analyst" && <BarChart3 className="w-2.5 h-2.5" />}
-                        </div>
-                        <span className="truncate text-xs">{item.title}</span>
-                      </div>
-                      <span className="opacity-0 group-hover:opacity-100 text-neutral-400 p-0.5">
-                        <MoreHorizontal className="w-3.5 h-3.5" />
-                      </span>
-                    </div>
-                  ))}
+                  {historyItems.filter(h => h.timeframe === "saved").map(item => renderHistoryItem(item, false))}
                 </div>
               </div>
 
@@ -616,22 +793,7 @@ export default function TaraAIPage() {
 
                 {!todayCollapsed && (
                   <div className="mt-1 space-y-1">
-                    {historyItems.filter(h => h.timeframe === "today").map(item => (
-                      <div 
-                        key={item.id}
-                        onClick={() => handleSelectHistory(item)}
-                        className={`group flex items-center justify-between px-3 py-2 rounded-full cursor-pointer transition-colors border ${
-                          activeChatId === item.id 
-                            ? "bg-white dark:bg-[#18181B] border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-white font-medium shadow-[0_2px_6px_rgba(0,0,0,0.03)]" 
-                            : "border-transparent text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/60"
-                        }`}
-                      >
-                        <span className="truncate pr-1 text-xs">{item.title}</span>
-                        <span className="opacity-0 group-hover:opacity-100 text-neutral-400 p-0.5 shrink-0">
-                          <MoreHorizontal className="w-3.5 h-3.5" />
-                        </span>
-                      </div>
-                    ))}
+                    {historyItems.filter(h => h.timeframe === "today").map(item => renderHistoryItem(item, false))}
                   </div>
                 )}
               </div>
@@ -648,22 +810,7 @@ export default function TaraAIPage() {
 
                 {!yesterdayCollapsed && (
                   <div className="mt-1 space-y-1">
-                    {historyItems.filter(h => h.timeframe === "yesterday").map(item => (
-                      <div 
-                        key={item.id}
-                        onClick={() => handleSelectHistory(item)}
-                        className={`group flex items-center justify-between px-3 py-2 rounded-full cursor-pointer transition-colors border ${
-                          activeChatId === item.id 
-                            ? "bg-white dark:bg-[#18181B] border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-white font-medium shadow-[0_2px_6px_rgba(0,0,0,0.03)]" 
-                            : "border-transparent text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/60"
-                        }`}
-                      >
-                        <span className="truncate pr-1 text-xs">{item.title}</span>
-                        <span className="opacity-0 group-hover:opacity-100 text-neutral-400 p-0.5 shrink-0">
-                          <MoreHorizontal className="w-3.5 h-3.5" />
-                        </span>
-                      </div>
-                    ))}
+                    {historyItems.filter(h => h.timeframe === "yesterday").map(item => renderHistoryItem(item, true))}
                   </div>
                 )}
               </div>

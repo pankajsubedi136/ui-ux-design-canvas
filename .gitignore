@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Private & Client designs (never commit to git)
+app/projects/vasuko-*
+app/projects/mac-explorer
+vasuko-email.html
+public/vasuko.png

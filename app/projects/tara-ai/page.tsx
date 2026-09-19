@@ -1106,14 +1106,13 @@ export default function TaraAIPage() {
               </div>
             )}
 
-            {/* Input Container (Smooth capsule styling with subtle shadow) */}
-            <div className={`rounded-[26px] border px-4 py-3.5 transition-all shadow-[0_4px_20px_rgba(0,0,0,0.05)] ${
-              isDarkMode ? "bg-[#131316] border-neutral-800 focus-within:border-neutral-600" : "bg-white border-neutral-200 focus-within:border-neutral-400"
+            {/* Input Container (Smooth capsule styling, seamless without separator line) */}
+            <div className={`rounded-[26px] border px-4.5 pt-3.5 pb-3 transition-all duration-200 shadow-[0_4px_20px_rgba(0,0,0,0.04)] ${
+              isDarkMode ? "bg-[#131316] border-neutral-800 focus-within:border-neutral-600 focus-within:shadow-[0_4px_24px_rgba(0,0,0,0.4)]" : "bg-white border-neutral-200 focus-within:border-neutral-400 focus-within:shadow-[0_6px_24px_rgba(0,0,0,0.07)]"
             }`}>
               
-              {/* Input Text Row */}
-              <div className="flex items-center gap-2.5 mb-3">
-                <Sparkles className="w-4 h-4 text-neutral-400 shrink-0" />
+              {/* Input Text Row (Clean direct text without start star icon) */}
+              <div className="w-full mb-3">
                 <input 
                   type="text"
                   value={inputText}
@@ -1125,12 +1124,12 @@ export default function TaraAIPage() {
                     }
                   }}
                   placeholder="Ask me anything..."
-                  className="w-full bg-transparent text-xs font-normal text-neutral-800 dark:text-neutral-100 placeholder-neutral-400 outline-none"
+                  className="w-full bg-transparent text-sm font-normal text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 outline-none px-0.5"
                 />
               </div>
 
-              {/* Bottom Controls Row with Capsule Pill Buttons */}
-              <div className="flex items-center justify-between pt-1 border-t border-neutral-100 dark:border-neutral-800">
+              {/* Bottom Controls Row: Seamless layout with NO separator line */}
+              <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
                 
                 {/* Select Source Dropdown */}
                 <div className="relative">

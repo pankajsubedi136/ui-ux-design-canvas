@@ -25,7 +25,6 @@ import {
   User,
   Copy,
   X,
-  PanelLeftOpen,
   Calendar,
   CircleDot,
   LayoutGrid,
@@ -633,15 +632,6 @@ export default function TaraAIPage() {
           
           {/* Left: Tara Logo, Title & Plus Badge */}
           <div className="flex items-center gap-2.5">
-            {!sidebarOpen && (
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="p-1.5 -ml-2 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition mr-1"
-                title="Expand Sidebar (⌘B)"
-              >
-                <PanelLeftOpen className="w-4 h-4" />
-              </button>
-            )}
             <TaraLogo className="w-4 h-4" />
             <h1 className="text-sm font-semibold text-[#0F172A] dark:text-white tracking-tight">
               Tara AI
